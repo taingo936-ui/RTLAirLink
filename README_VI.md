@@ -4,6 +4,10 @@ Bản thử nghiệm driver Realtek RTL8852BE cho macOS, phát triển từ AirP
 
 [![Ủng hộ qua Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
 
+## Find me
+
+[Discord](https://discord.com/app) · **`_taingo`** — mở Discord, chọn **Thêm bạn**, rồi nhập `_taingo`.
+
 Hai kext được phát hành cùng nhau:
 
 - `RTLAirLink.kext`: driver Wi-Fi, chứa frontend `AirPortRTW89Front.kext`.

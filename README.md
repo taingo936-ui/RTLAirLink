@@ -4,6 +4,10 @@ Experimental Realtek RTL8852BE Wi-Fi and native AWDL integration for macOS, deri
 
 [![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
 
+## Find me
+
+[Discord](https://discord.com/app) · **`_taingo`** — open Discord, choose **Add Friend**, and enter `_taingo`.
+
 The project ships two top-level kext bundles together:
 
 | Bundle | Role |

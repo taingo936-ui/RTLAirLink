@@ -98,6 +98,58 @@ def bridge_build(work, output, front_uuid):
     return bundle
 
 
+def assemble(work, bridge, output, report):
+    """Validate and package the compiled cohort; used by the complete builder."""
+    driver = work / 'build/out/AirPort_RTW89.kext'
+    front = work / 'build/out/AirPortRTW89Front.kext'
+    host = (work / 'build/log/hosttest_fakechip.log').read_text()
+    for label, expected in [('software AWDL integration', 12), ('AWDL SCC lifecycle', 28)]:
+        rows = re.findall(r'== ' + label + r': (\d+) check\(s\), (\d+) failure\(s\)', host)
+        require(len(rows) == 4 and all(int(n) == expected and int(f) == 0 for n, f in rows),
+                'Host lifecycle results differ: ' + label)
+    report['driver_host_tests'] = {'runs': 4, 'awdl_checks_per_run': 12,
+                                   'lifecycle_checks_per_run': 28, 'failures': 0}
+    assembly = output / 'assembly'
+    assembly.mkdir()
+    renamed = assembly / CONFIG['bundle_names']['backend']
+    shutil.copytree(driver, renamed)
+    shutil.copytree(front, renamed / 'Contents/PlugIns' / front.name)
+    shutil.copytree(ROOT / 'Resources', renamed / 'Contents/Resources', dirs_exist_ok=True)
+    renamed_bridge = assembly / CONFIG['bundle_names']['bridge']
+    shutil.copytree(bridge, renamed_bridge)
+    run(['codesign', '--force', '--sign', '-', '--timestamp=none', str(renamed)],
+        output / 'driver-sign.log')
+    cohort = {}
+    for label, bundle, key in [
+        ('backend', renamed, 'native_backend_allowed_imports'),
+        ('frontend', renamed / 'Contents/PlugIns' / front.name, 'native_frontend_allowed_imports'),
+        ('bridge', renamed_bridge, 'bridge_imports')]:
+        run(['codesign', '--verify', '--deep', '--strict', str(bundle)],
+            output / (label + '-verify.log'))
+        binary = executable(bundle)
+        imports = set(subprocess.check_output(['nm', '-u', '-j', str(binary)], text=True).split())
+        require(not imports - set(CONFIG[key]), label + ' has unreviewed imports')
+        if label == 'frontend':
+            require(set(CONFIG['native_required_frontend_imports']) <= imports,
+                    'Required frontend imports are missing')
+        cohort[label] = {'uuid': uuid(binary), 'sha256': sha(binary),
+                         'bundle_identifier': plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())['CFBundleIdentifier']}
+    report.update(status='BUILD_VERIFIED_RUNTIME_UNPROVEN', cohort=cohort)
+    (assembly / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')
+    shutil.copy(ROOT / 'LICENSE', assembly / 'LICENSE')
+    shutil.copytree(ROOT / 'LICENSES', assembly / 'LICENSES')
+    for name in ['CREDITS.md', 'docs/INSTALL.md']:
+        shutil.copy(ROOT / name, assembly / Path(name).name)
+    verified = output / 'VERIFIED_KEXTS'
+    assembly.rename(verified)
+    with zipfile.ZipFile(output / 'RTLAirLink-Fix46-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(verified.rglob('*')):
+            if path.is_file():
+                archive.write(path, 'RTLAirLink-Fix46/' + path.relative_to(verified).as_posix())
+    with zipfile.ZipFile(output / 'RTLAirLink-Fix46-x86_64.zip') as archive:
+        require(archive.testzip() is None, 'Release ZIP CRC check failed')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checks-only', action='store_true')
@@ -145,55 +197,14 @@ def main():
             run(['codesign', '--force', '--sign', '-', '--timestamp=none', str(front)],
                 output / 'frontend-sign.log')
             bridge = bridge_build(work, output, uuid(executable(front)))
-            host = (work / 'build/log/hosttest_fakechip.log').read_text()
-            for label, expected in [('software AWDL integration', 12), ('AWDL SCC lifecycle', 28)]:
-                rows = re.findall(r'== ' + label + r': (\d+) check\(s\), (\d+) failure\(s\)', host)
-                require(len(rows) == 4 and all(int(n) == expected and int(f) == 0 for n, f in rows),
-                        'Host lifecycle results differ: ' + label)
-            report['driver_host_tests'] = {'runs': 4, 'awdl_checks_per_run': 12,
-                                           'lifecycle_checks_per_run': 28, 'failures': 0}
-            assembly = output / 'assembly'
-            assembly.mkdir()
-            renamed = assembly / CONFIG['bundle_names']['backend']
-            shutil.copytree(driver, renamed)
-            shutil.copytree(front, renamed / 'Contents/PlugIns' / front.name)
-            shutil.copytree(ROOT / 'Resources', renamed / 'Contents/Resources', dirs_exist_ok=True)
-            renamed_bridge = assembly / CONFIG['bundle_names']['bridge']
-            shutil.copytree(bridge, renamed_bridge)
-            run(['codesign', '--force', '--sign', '-', '--timestamp=none', str(renamed)],
-                output / 'driver-sign.log')
-            cohort = {}
-            for label, bundle, key in [
-                ('backend', renamed, 'native_backend_allowed_imports'),
-                ('frontend', renamed / 'Contents/PlugIns' / front.name, 'native_frontend_allowed_imports'),
-                ('bridge', renamed_bridge, 'bridge_imports')]:
-                run(['codesign', '--verify', '--deep', '--strict', str(bundle)],
-                    output / (label + '-verify.log'))
-                binary = executable(bundle)
-                imports = set(subprocess.check_output(['nm', '-u', '-j', str(binary)], text=True).split())
-                require(not imports - set(CONFIG[key]), label + ' has unreviewed imports')
-                if label == 'frontend':
-                    require(set(CONFIG['native_required_frontend_imports']) <= imports,
-                            'Required frontend imports are missing')
-                cohort[label] = {'uuid': uuid(binary), 'sha256': sha(binary),
-                                 'bundle_identifier': plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())['CFBundleIdentifier']}
             require(all(sha(work / name) == value for name, value in source_before.items()),
                     'Source changed during build')
-            report.update(status='BUILD_VERIFIED_RUNTIME_UNPROVEN', cohort=cohort)
-            (assembly / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')
-            shutil.copy(ROOT / 'LICENSE', assembly / 'LICENSE')
-            shutil.copytree(ROOT / 'LICENSES', assembly / 'LICENSES')
-            for name in ['CREDITS.md', 'docs/INSTALL.md']:
-                shutil.copy(ROOT / name, assembly / Path(name).name)
-            verified = output / 'VERIFIED_KEXTS'
-            assembly.rename(verified)
-            with zipfile.ZipFile(output / 'RTLAirLink-Fix46-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-                for path in sorted(verified.rglob('*')):
-                    if path.is_file():
-                        archive.write(path, 'RTLAirLink-Fix46/' + path.relative_to(verified).as_posix())
+            assemble(work, bridge, output, report)
     except Exception as error:
         report.update(status='BUILD_FAILED', error=str(error))
-        shutil.rmtree(output / 'assembly', ignore_errors=True)
+        for folder in ('assembly', 'VERIFIED_KEXTS'):
+            shutil.rmtree(output / folder, ignore_errors=True)
+        (output / 'RTLAirLink-Fix46-x86_64.zip').unlink(missing_ok=True)
         raise
     finally:
         (output / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')

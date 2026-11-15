@@ -1220,6 +1220,7 @@
     "_memcpy",
     "_memset",
     "_nanoseconds_to_absolutetime",
+    "_snprintf",
     "_strcmp",
     "_thread_call_allocate",
     "_thread_call_cancel",

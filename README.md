@@ -56,4 +56,7 @@ See [BUILD.md](docs/BUILD.md), [STATUS.md](docs/STATUS.md), [MODIFICATIONS.md](M
 
 ## License and attribution
 
+<!-- Buy Me a Coffee: add a badge/link here only after the owner provides their
+actual account URL; configure .github/FUNDING.yml at the same time. -->
+
 The driver/bridge work is distributed under GPLv2; retain original copyright and license notices. [CREDITS.md](CREDITS.md) identifies the inherited projects. Dependencies retain their licenses in their source trees and [LICENSES](LICENSES/). Realtek firmware remains under its own terms, including its redistribution and patent conditions; it is not relicensed under GPLv2. RTLAirLink is an independent derivative project and does not claim endorsement by Realtek, Apple or upstream authors.

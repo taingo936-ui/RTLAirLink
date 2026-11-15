@@ -1,0 +1,5 @@
+# Preserve vendored source/catalog bytes and their recorded hashes on checkout.
+* -text
+*.bin binary
+*.a binary
+*.o binary

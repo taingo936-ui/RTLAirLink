@@ -1,0 +1,222 @@
+{
+  "legacy_uuid": "4C07538B-62EB-3D6D-AEF9-93BCDCF45FAB",
+  "legacy_sha256": "ac2dc15b77f8eaf97b71b34c5d0e1b59f862bfeac618396449306e1837e73894",
+  "slots": [
+    {
+      "word": 268,
+      "symbol": "__ZN23IO80211VirtualInterface4initEP17IO80211ControllerP10ether_addrjPKc"
+    },
+    {
+      "word": 269,
+      "symbol": "__ZN19IO80211P2PInterface17createPeerManagerEP10ether_addrPP18IO80211PeerManager"
+    },
+    {
+      "word": 270,
+      "symbol": "__ZN23IO80211VirtualInterface13getMediumTypeEv"
+    },
+    {
+      "word": 271,
+      "symbol": "__ZN23IO80211VirtualInterface12setLinkStateE16IO80211LinkStatej"
+    },
+    {
+      "word": 272,
+      "symbol": "__ZN23IO80211VirtualInterface36dequeueOutputPacketsWithServiceClassEj18IOMbufServiceClassPP6__mbufS3_PjPy"
+    },
+    {
+      "word": 273,
+      "symbol": "__ZN23IO80211VirtualInterface12outputPacketEP6__mbufPv"
+    },
+    {
+      "word": 274,
+      "symbol": "__ZN23IO80211VirtualInterface18setEnabledBySystemEb"
+    },
+    {
+      "word": 275,
+      "symbol": "__ZN23IO80211VirtualInterface11handleIoctlEmPv"
+    },
+    {
+      "word": 276,
+      "symbol": "__ZN23IO80211VirtualInterface11inputPacketEP6__mbufP15packet_info_tag"
+    },
+    {
+      "word": 277,
+      "symbol": "__ZN23IO80211VirtualInterface30controllerWillChangePowerStateEP17IO80211ControllermjP9IOService"
+    },
+    {
+      "word": 278,
+      "symbol": "__ZN23IO80211VirtualInterface29controllerDidChangePowerStateEP17IO80211ControllermjP9IOService"
+    },
+    {
+      "word": 279,
+      "symbol": "__ZN23IO80211VirtualInterface14handleDebugCmdEP24apple80211_debug_command"
+    },
+    {
+      "word": 280,
+      "symbol": "__ZN23IO80211VirtualInterface18signalOutputThreadEv"
+    },
+    {
+      "word": 281,
+      "symbol": "__ZN23IO80211VirtualInterface22isOutputFlowControlledEv"
+    },
+    {
+      "word": 282,
+      "symbol": "__ZN23IO80211VirtualInterface23setOutputFlowControlledEv"
+    },
+    {
+      "word": 283,
+      "symbol": "__ZN23IO80211VirtualInterface25clearOutputFlowControlledEv"
+    },
+    {
+      "word": 284,
+      "symbol": "__ZN23IO80211VirtualInterface11outputStartEj"
+    },
+    {
+      "word": 285,
+      "symbol": "__ZN23IO80211VirtualInterface18configureAQMOutputEv"
+    },
+    {
+      "word": 286,
+      "symbol": "__ZN19IO80211P2PInterface13setUnitNumberEPKc"
+    },
+    {
+      "word": 287,
+      "symbol": "__ZN19IO80211P2PInterface16initIfnetEparamsEP18ifnet_init_eparams"
+    },
+    {
+      "word": 288,
+      "symbol": "__ZN19IO80211P2PInterface11attachToBpfEv"
+    },
+    {
+      "word": 289,
+      "symbol": "__ZN19IO80211P2PInterface14configureIfnetEv"
+    },
+    {
+      "word": 290,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface0Ev"
+    },
+    {
+      "word": 291,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface1Ev"
+    },
+    {
+      "word": 292,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface2Ev"
+    },
+    {
+      "word": 293,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface3Ev"
+    },
+    {
+      "word": 294,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface4Ev"
+    },
+    {
+      "word": 295,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface5Ev"
+    },
+    {
+      "word": 296,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface6Ev"
+    },
+    {
+      "word": 297,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface7Ev"
+    },
+    {
+      "word": 298,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface8Ev"
+    },
+    {
+      "word": 299,
+      "symbol": "__ZN23IO80211VirtualInterface33_RESERVEDIO80211VirtualInterface9Ev"
+    },
+    {
+      "word": 300,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface10Ev"
+    },
+    {
+      "word": 301,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface11Ev"
+    },
+    {
+      "word": 302,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface12Ev"
+    },
+    {
+      "word": 303,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface13Ev"
+    },
+    {
+      "word": 304,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface14Ev"
+    },
+    {
+      "word": 305,
+      "symbol": "__ZN23IO80211VirtualInterface34_RESERVEDIO80211VirtualInterface15Ev"
+    },
+    {
+      "word": 306,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface0Ev"
+    },
+    {
+      "word": 307,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface1Ev"
+    },
+    {
+      "word": 308,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface2Ev"
+    },
+    {
+      "word": 309,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface3Ev"
+    },
+    {
+      "word": 310,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface4Ev"
+    },
+    {
+      "word": 311,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface5Ev"
+    },
+    {
+      "word": 312,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface6Ev"
+    },
+    {
+      "word": 313,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface7Ev"
+    },
+    {
+      "word": 314,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface8Ev"
+    },
+    {
+      "word": 315,
+      "symbol": "__ZN19IO80211P2PInterface29_RESERVEDIO80211P2PInterface9Ev"
+    },
+    {
+      "word": 316,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface10Ev"
+    },
+    {
+      "word": 317,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface11Ev"
+    },
+    {
+      "word": 318,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface12Ev"
+    },
+    {
+      "word": 319,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface13Ev"
+    },
+    {
+      "word": 320,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface14Ev"
+    },
+    {
+      "word": 321,
+      "symbol": "__ZN19IO80211P2PInterface30_RESERVEDIO80211P2PInterface15Ev"
+    }
+  ]
+}

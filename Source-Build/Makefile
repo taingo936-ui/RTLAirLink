@@ -1,0 +1,587 @@
+# AirPort_RTW89 — Linux rtw89 (RTL8852BE) for macOS
+#
+# Workflow (run from the repo root):
+#   make fetch-firmware          # once
+#   make -k compile              # compile every object, keep going on errors
+#   make errors                  # group errors into docs/compile-status.md
+#   make link                    # partial-link all objects, check what is left
+#                                # for the kernel (docs/kernel-imports.md)
+#   make hosttest                # run probe()/remove() and the self-test in userspace
+#   make kext                    # build/out/AirPort_RTW89.kext (runs hosttest first)
+#
+# Loading the kext is never done from here; see CLAUDE.md.
+
+HOST_CPUS    := $(shell sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+MAKEFLAGS    += -j$(HOST_CPUS)
+
+# Relative on purpose: make cannot cope with spaces in absolute paths.
+PROJ_ROOT    := .
+RTW89_SRC    := $(PROJ_ROOT)/third_party/rtw89
+COMPAT_DIR   := $(PROJ_ROOT)/src/compat
+COMPAT89_DIR := $(PROJ_ROOT)/src/compat_rtw89
+MKSDK        := $(PROJ_ROOT)/third_party/MacKernelSDK
+LINUX_INC    := $(PROJ_ROOT)/third_party/linux-include
+FIRMWARE_DIR := $(PROJ_ROOT)/firmware
+BUILD_DIR    := $(PROJ_ROOT)/build
+
+SDK          := $(shell xcrun --show-sdk-path 2>/dev/null)
+ARCH         := -arch x86_64
+MINOS        := -mmacosx-version-min=13.0
+CC           := xcrun clang
+CXX          := xcrun clang++
+
+# Optimise like the Linux build this code is written for: -O0 frames are far
+# larger and the kernel stack is 16 KB. The -f flags are the dialect Linux
+# compiles drivers in (type punning, wrapping arithmetic, no "this pointer was
+# dereferenced, so it cannot be NULL" deductions).
+KEXT_FLAGS   := -fno-exceptions -fno-stack-protector -mkernel \
+                -O2 -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks \
+                -fno-omit-frame-pointer -Wframe-larger-than=1024 \
+                -MMD -MP \
+                $(ARCH) $(MINOS) \
+                -isysroot $(SDK) \
+                -I$(MKSDK)/Headers \
+                -I$(SDK)/System/Library/Frameworks/Kernel.framework/Headers
+
+# rtw89 overlay first so its linux/*.h win, then the unmodified upstream
+# 802.11 headers (ieee80211, nl80211, cfg80211, mac80211), then the inherited
+# rtw88 shims for everything below them.
+COMPAT_FLAGS := -I$(COMPAT89_DIR) \
+                -I$(LINUX_INC) \
+                -I$(LINUX_INC)/uapi \
+                -I$(COMPAT_DIR) \
+                -I$(COMPAT_DIR)/linux
+
+# Every IOLog of the driver also lands in its own log ring (src/kext/rtw89_logring.cpp,
+# read with `rtw89ctl log`); the hosttest provides rtw89_iolog as printf.
+LOGRING_DEF := -DIOLog=rtw89_iolog
+
+# OWLY: experimental hardware P2P-client second VIF, never opt-in by default.
+# BOTH FRONT and BACK must be rebuilt with this switch, ABI is version 5.
+OWLY_BACKEND_REAL_VIF ?= 0
+RTW89_AWDL_VIF_STAGE ?= $(OWLY_BACKEND_REAL_VIF)
+RTW89_AWDL_VIF_REGISTER ?= 0
+RTW89_AWDL_CHANCTX_ATTACH ?= 0
+# On-demand shared-channel lifecycle. This is separate from the old automatic
+# Core04D/04F trial. No TX, channel hopping, or Apple sync-ready claim.
+OWLY_AWDL_RADIO_SCC ?= 0
+# Real software PSF scheduling and aux-VIF management TX; explicit build opt-in.
+OWLY_AWDL_SOFTWARE_SYNC ?= 0
+OWLY_NATIVE_PEER_DATA ?= 0
+# Guarded native SET120 interface preparation. Not a radio/peer success flag.
+OWLY_AWDL_SERVICE_LIFECYCLE ?= 0
+# Connected serving-AP beacon lease for world-added NO_IR only.
+OWLY_WORLD_BEACON_HINT ?= 0
+ifneq ($(filter-out 0 1,$(OWLY_WORLD_BEACON_HINT)),)
+$(error OWLY_WORLD_BEACON_HINT must be 0 or 1)
+endif
+ifneq ($(filter-out 0 1,$(OWLY_AWDL_SERVICE_LIFECYCLE)),)
+$(error OWLY_AWDL_SERVICE_LIFECYCLE must be 0 or 1)
+endif
+ifeq ($(OWLY_AWDL_SERVICE_LIFECYCLE),1)
+ifneq ($(OWLY_AWDL_SOFTWARE_SYNC),1)
+$(error Service lifecycle requires the software AWDL backend)
+endif
+endif
+ifneq ($(filter-out 0 1,$(OWLY_AWDL_SOFTWARE_SYNC)),)
+$(error OWLY_AWDL_SOFTWARE_SYNC must be 0 or 1)
+endif
+ifeq ($(OWLY_AWDL_SOFTWARE_SYNC),1)
+ifneq ($(OWLY_AWDL_RADIO_SCC),1)
+$(error Software AWDL requires guarded Radio SCC)
+endif
+endif
+RTW89_AWDL_CHANCTX_GUARD ?= 0
+# OWLY RX shadow: passive codec, never TX, 0 preserves original driver.
+OWLY_AWDL_RX_SHADOW ?= 0
+# Controlled social-channel OTHER_BSS receive filter (OFF by default).
+OWLY_SCC_SOCIAL_RX ?= 0
+
+# ABI6: real RX demultiplexing seam; OFF by default until Apple VIF ABI,
+# packet ownership, peer authentication, and lifecycle are verified.
+OWLY_ABI6_RX_DEMUX ?= 0
+# ABI6 copy-safe cross-KEXT seam. OFF until native Apple P2P RX contract is
+# verified. NEVER treat this as AWDL delivery: frontend fail-closes.
+OWLY_ABI6_FRONT_BRIDGE ?= 0
+# Gate C3: scan-time AWDL Action signature observer. No STA RX ownership or Apple RX.
+OWLY_ABI6_C3_SCAN_OBSERVER ?= 0
+# Experimental truthful AWDL sync status GET117 only; default OFF.
+OWLY_ABI6_GET117_CONTRACT ?= 0
+ifeq ($(OWLY_ABI6_C3_SCAN_OBSERVER),1)
+ifneq ($(OWLY_ABI6_RX_DEMUX),1)
+$(error Gate C3 requires Gate C2 RX demux)
+endif
+ifneq ($(OWLY_ABI6_FRONT_BRIDGE),1)
+$(error Gate C3 requires Gate C2 frontend bridge)
+endif
+endif
+ifeq ($(OWLY_ABI6_FRONT_BRIDGE),1)
+ifneq ($(OWLY_ABI6_RX_DEMUX),1)
+$(error ABI6 cross-KEXT bridge requires RX DEMUX=1)
+endif
+endif
+
+ifneq ($(filter-out 0 1,$(OWLY_SCC_SOCIAL_RX)),)
+$(error OWLY_SCC_SOCIAL_RX must be 0 or 1)
+endif
+ifneq ($(filter-out 0 1,$(OWLY_AWDL_RX_SHADOW)),)
+$(error OWLY_AWDL_RX_SHADOW must be 0 or 1)
+endif
+ifneq ($(filter-out 0 1,$(OWLY_AWDL_RADIO_SCC)),)
+$(error OWLY_AWDL_RADIO_SCC must be 0 or 1)
+endif
+ifeq ($(OWLY_AWDL_RADIO_SCC),1)
+ifneq ($(OWLY_BACKEND_REAL_VIF),1)
+$(error Radio SCC requires the on-demand backend VIF)
+endif
+ifneq ($(RTW89_AWDL_CHANCTX_GUARD),1)
+$(error Radio SCC requires the existing guarded driver assignment rollback)
+endif
+ifneq ($(RTW89_AWDL_CHANCTX_ATTACH),0)
+$(error Radio SCC must not enable the old automatic Core04D attach path)
+endif
+endif
+ifneq ($(OWLY_BACKEND_REAL_VIF),0)
+ifneq ($(RTW89_AWDL_VIF_STAGE),1)
+$(error Backend VIF requires RTW89_AWDL_VIF_STAGE=1)
+endif
+ifneq ($(RTW89_AWDL_VIF_REGISTER),0)
+$(error Backend VIF forbids automatic VIF creation)
+endif
+ifneq ($(RTW89_AWDL_CHANCTX_ATTACH),0)
+$(error Backend VIF forbids chanctx attach)
+endif
+endif
+
+DRIVER_CFLAGS := \
+    $(KEXT_FLAGS) $(COMPAT_FLAGS) $(LOGRING_DEF) \
+    -include $(COMPAT89_DIR)/rtw89_compat.h \
+    -I$(RTW89_SRC) \
+    -std=gnu11 \
+    -DRTW89_MACOS=1 -DRTW88_MACOS=1 -D__KERNEL__ \
+    -DOWLY_BACKEND_REAL_VIF=$(OWLY_BACKEND_REAL_VIF) \
+    -DRTW89_AWDL_VIF_STAGE=$(RTW89_AWDL_VIF_STAGE) \
+    -DRTW89_AWDL_VIF_REGISTER=$(RTW89_AWDL_VIF_REGISTER) \
+    -DRTW89_AWDL_CHANCTX_ATTACH=$(RTW89_AWDL_CHANCTX_ATTACH) \
+    -DOWLY_AWDL_RADIO_SCC=$(OWLY_AWDL_RADIO_SCC) \
+    -DOWLY_AWDL_SOFTWARE_SYNC=$(OWLY_AWDL_SOFTWARE_SYNC) \
+    -DOWLY_NATIVE_PEER_DATA=$(OWLY_NATIVE_PEER_DATA) \
+    -DOWLY_WORLD_BEACON_HINT=$(OWLY_WORLD_BEACON_HINT) \
+    -DRTW89_AWDL_CHANCTX_GUARD=$(RTW89_AWDL_CHANCTX_GUARD) \
+    -DOWLY_AWDL_RX_SHADOW=$(OWLY_AWDL_RX_SHADOW) \
+    -DOWLY_SCC_SOCIAL_RX=$(OWLY_SCC_SOCIAL_RX) \
+    -DOWLY_ABI6_RX_DEMUX=$(OWLY_ABI6_RX_DEMUX) \
+    -DOWLY_ABI6_FRONT_BRIDGE=$(OWLY_ABI6_FRONT_BRIDGE) \
+    -DOWLY_ABI6_C3_SCAN_OBSERVER=$(OWLY_ABI6_C3_SCAN_OBSERVER) \
+    -DCONFIG_RTW89_DEBUGMSG=1 \
+    -Werror=implicit-function-declaration \
+    -Werror=int-conversion \
+    -Werror=incompatible-pointer-types \
+    -Wno-unused-variable -Wno-unused-function \
+    -ferror-limit=0
+
+# ------------------------------------------------------------------ #
+# Sources                                                              #
+# ------------------------------------------------------------------ #
+
+# rtw89_core + rtw89_pci (wow.c excluded until sleep/wake; debug.c replaced
+# by src/compat_rtw89/rtw89_debug_shim.c)
+# core.c is compiled through src/compat_rtw89/rtw89_core_wrap.c, which includes
+# it unchanged and adds one function that needs its static helpers.
+CORE_SRCS := mac80211 mac mac_be phy phy_be fw cam efuse efuse_be \
+             regd sar coex ps chan ser acpi util pci pci_be
+
+# The chips and their PCIe front ends (the USB ones are left out)
+CHIP_SRCS := rtw8851b rtw8851b_table rtw8851b_rfk rtw8851b_rfk_table rtw8851be \
+             rtw8852a rtw8852a_table rtw8852a_rfk rtw8852a_rfk_table rtw8852ae \
+             rtw8852b_common rtw8852b rtw8852b_table rtw8852b_rfk \
+             rtw8852b_rfk_table rtw8852be \
+             rtw8852bt rtw8852bt_rfk rtw8852bt_rfk_table rtw8852bte \
+             rtw8852c rtw8852c_table rtw8852c_rfk rtw8852c_rfk_table rtw8852ce \
+             rtw8922a rtw8922a_rfk rtw8922ae \
+             rtw8922d rtw8922d_rfk rtw8922de
+
+# Inherited compat runtime
+COMPAT_SRCS := $(COMPAT_DIR)/rtw88_thread_call.c \
+               $(COMPAT_DIR)/rtw88_compat.c
+
+# rtw89_cfg80211.c / rtw89_mac80211.c: the code behind the upstream
+# net/cfg80211.h and net/mac80211.h that the driver calls.
+COMPAT89_SRCS := $(COMPAT89_DIR)/rtw89_compat.c \
+                 $(COMPAT89_DIR)/rtw89_cfg80211.c \
+                 $(COMPAT89_DIR)/rtw89_cfg80211_bitrate.c \
+                 $(COMPAT89_DIR)/rtw89_mac80211.c \
+                 $(COMPAT89_DIR)/rtw89_mlme.c \
+                 $(COMPAT89_DIR)/rtw89_data.c \
+                 $(COMPAT89_DIR)/rtw89_glue.c \
+                 $(COMPAT89_DIR)/rtw89_core_wrap.c \
+                 $(COMPAT89_DIR)/rtw89_debug_shim.c
+ifeq ($(OWLY_AWDL_SOFTWARE_SYNC),1)
+COMPAT89_SRCS += $(COMPAT89_DIR)/owly_awdl_sync.c $(COMPAT89_DIR)/owly_native_config.c
+endif
+ifeq ($(OWLY_NATIVE_PEER_DATA),1)
+ifneq ($(OWLY_AWDL_SOFTWARE_SYNC),1)
+$(error Native peer/data requires software sync and both rebuilt components)
+endif
+COMPAT89_SRCS += $(COMPAT89_DIR)/owly_native_link.c
+endif
+# Link the AWDL RX codec only in experimental observer builds.
+ifeq ($(OWLY_AWDL_RX_SHADOW),1)
+COMPAT89_SRCS += $(COMPAT89_DIR)/owly_awdl_frame.c $(COMPAT89_DIR)/owly_awdl_shadow.c
+endif
+ifeq ($(OWLY_ABI6_RX_DEMUX),1)
+ifneq ($(OWLY_AWDL_RX_SHADOW),1)
+$(error ABI6 RX demux requires the existing AWDL frame codec / shadow build)
+endif
+ifneq ($(OWLY_SCC_SOCIAL_RX),1)
+$(error ABI6 RX demux requires SCC social RX)
+endif
+COMPAT89_SRCS += $(COMPAT89_DIR)/owly_abi6_rx.c
+endif
+
+DRIVER_OBJS   := $(patsubst %,$(BUILD_DIR)/rtw89/%.o,$(CORE_SRCS) $(CHIP_SRCS))
+COMPAT_OBJS   := $(patsubst $(COMPAT_DIR)/%.c,$(BUILD_DIR)/compat/%.o,$(COMPAT_SRCS))
+COMPAT89_OBJS := $(patsubst $(COMPAT89_DIR)/%.c,$(BUILD_DIR)/compat_rtw89/%.o,$(COMPAT89_SRCS))
+
+# Firmware loader + the images from firmware/, embedded as zlib blobs. The table
+# is empty until `make fetch-firmware` has been run.
+GEN_DIR       := $(BUILD_DIR)/gen
+FW_BLOBS_C    := $(GEN_DIR)/fw_blobs.c
+FW_BINS       := $(wildcard $(FIRMWARE_DIR)/*.bin)
+FW_OBJS       := $(BUILD_DIR)/fw/rtw88_firmware.o $(BUILD_DIR)/fw/fw_blobs.o \
+                 $(BUILD_DIR)/fw/rtw89_crypto.o
+# Plain kernel C: rtw88_firmware.c is written against IOKit, not the Linux shims.
+FW_CFLAGS     := $(KEXT_FLAGS) $(LOGRING_DEF) -std=gnu11 -DKERNEL -I$(COMPAT_DIR)
+
+# WPA3: hostap's SAE code on Mbed TLS (third_party/), adapted by
+# src/compat_rtw89/rtw89_hostap.c and the stand-in headers in hostap/.
+SAE_INC  := -I$(COMPAT89_DIR)/hostap -I$(PROJ_ROOT)/third_party/hostap/src \
+            -I$(PROJ_ROOT)/third_party/hostap/src/utils -I$(PROJ_ROOT)/third_party/hostap/src/common \
+            -I$(PROJ_ROOT)/third_party/mbedtls/include -I$(PROJ_ROOT)/third_party/mbedtls/library \
+            -I$(COMPAT89_DIR) -DMBEDTLS_CONFIG_FILE='"rtw89_mbedtls_config.h"'
+SAE_SRCS := third_party/hostap/src/common/sae.c third_party/hostap/src/common/dragonfly.c \
+            $(COMPAT89_DIR)/rtw89_wpabuf.c \
+            $(addprefix third_party/mbedtls/library/,bignum.c bignum_core.c ecp.c ecp_curves.c \
+                constant_time.c platform_util.c) \
+            $(COMPAT89_DIR)/rtw89_hostap.c $(COMPAT89_DIR)/rtw89_sae.c
+# The same files built for the kernel: plain C with the stand-in libc headers
+# (hostap/kernel_libc) in front of the SDK's, the driver's IOLog redirect, and
+# no warnings for code that is not ours.
+SAE_KFLAGS := $(KEXT_FLAGS) $(LOGRING_DEF) -std=gnu11 -DKERNEL -w \
+              -I$(COMPAT89_DIR)/hostap/kernel_libc $(SAE_INC)
+SAE_KOBJS  := $(patsubst %.c,$(BUILD_DIR)/sae/%.o,$(notdir $(SAE_SRCS)))
+
+ALL_OBJS      := $(DRIVER_OBJS) $(COMPAT_OBJS) $(COMPAT89_OBJS) $(FW_OBJS) $(SAE_KOBJS)
+
+# ------------------------------------------------------------------ #
+# Targets                                                              #
+# ------------------------------------------------------------------ #
+
+.PHONY: front deptest all compile errors link hosttest saetest kext fetch-firmware bundle release clean
+
+all: compile
+
+compile: $(ALL_OBJS)
+	@echo "  OK   all $(words $(ALL_OBJS)) objects compiled"
+
+# Each object's compiler output also lands in build/log/<name>.log so a
+# `make -k` run leaves a complete, per-file error record.
+$(BUILD_DIR)/rtw89/%.o: $(RTW89_SRC)/%.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   $*.c"
+	@$(CC) $(DRIVER_CFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/$*.log || { cat $(BUILD_DIR)/log/$*.log >&2; exit 1; }
+
+$(BUILD_DIR)/compat/%.o: $(COMPAT_DIR)/%.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   compat/$*.c"
+	@$(CC) $(DRIVER_CFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/compat_$*.log || { cat $(BUILD_DIR)/log/compat_$*.log >&2; exit 1; }
+
+$(BUILD_DIR)/compat_rtw89/%.o: $(COMPAT89_DIR)/%.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   compat_rtw89/$*.c"
+	@$(CC) $(DRIVER_CFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/compat89_$*.log || { cat $(BUILD_DIR)/log/compat89_$*.log >&2; exit 1; }
+
+$(FW_BLOBS_C): $(FW_BINS) tools/gen_fw_blobs.py
+	@python3 tools/gen_fw_blobs.py $(FIRMWARE_DIR) $@
+
+$(BUILD_DIR)/fw/rtw88_firmware.o: $(COMPAT_DIR)/rtw88_firmware.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   compat/rtw88_firmware.c"
+	@$(CC) $(FW_CFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/fw_rtw88_firmware.log || { cat $(BUILD_DIR)/log/fw_rtw88_firmware.log >&2; exit 1; }
+
+# Self-contained C (no Linux shims), shared with the userspace smoke test.
+$(BUILD_DIR)/fw/rtw89_crypto.o: $(COMPAT89_DIR)/rtw89_crypto.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   compat_rtw89/rtw89_crypto.c"
+	@$(CC) $(FW_CFLAGS) -Wall -c $< -o $@ 2> $(BUILD_DIR)/log/fw_rtw89_crypto.log || { cat $(BUILD_DIR)/log/fw_rtw89_crypto.log >&2; exit 1; }
+
+$(BUILD_DIR)/fw/fw_blobs.o: $(FW_BLOBS_C)
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   gen/fw_blobs.c"
+	@$(CC) $(FW_CFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/fw_fw_blobs.log || { cat $(BUILD_DIR)/log/fw_fw_blobs.log >&2; exit 1; }
+
+errors:
+	@python3 tools/errsum.py $(BUILD_DIR)/log docs/compile-status.md
+
+# Everything except the IOKit glue in one relocatable object. Fails if a symbol
+# is left that the kernel does not have, i.e. a Linux function nobody provides.
+LINKED_OBJ := $(BUILD_DIR)/out/AirPort_RTW89.o
+link: compile
+	@mkdir -p $(dir $(LINKED_OBJ))
+	@ld -r $(ARCH) -o $(LINKED_OBJ) $(ALL_OBJS)
+	@python3 tools/check_imports.py $(LINKED_OBJ) docs/kernel-imports.md
+
+# rtw89 asks for the highest firmware format it knows first (RTW8852B_FW_FORMAT_MAX
+# = 2 -> rtw8852b_fw-2.bin) and only then falls back to older ones.
+# Userspace smoke test: the same linked object as the kext, with pthread-based
+# stand-ins for its kernel imports and a PCI device that does not answer. Run it
+# before every kext load; a crash here would have been a panic there.
+HOSTTEST := $(BUILD_DIR)/out/hosttest
+HOST_OBJS := $(BUILD_DIR)/out/host_main.o $(BUILD_DIR)/out/host_kernel.o $(BUILD_DIR)/out/selftest.o
+# Runs one smoke-test binary: $(call hostrun,<binary>,<args>,<log name>)
+# PCI IDs of the chips other than the RTL8852BE (b852), one or two per family
+OTHER_CHIP_IDS := b851 8852 a85a b85b b520 c852 8922 892b 892d 882d 895d
+
+define hostrun
+	@echo "  RUN  $(1) $(2)"
+	@perl -e 'alarm 600; exec @ARGV' $(1) $(2) > $(BUILD_DIR)/log/$(3).log 2>&1; \
+	    rc=$$?; grep -E '^==|WARN|BUG|HOST:|mlme\]' $(BUILD_DIR)/log/$(3).log; \
+	    [ $$rc -eq 0 ] || { echo "  hosttest FAILED (exit $$rc), see $(BUILD_DIR)/log/$(3).log"; exit 1; }
+endef
+
+SAETEST  := $(BUILD_DIR)/out/sae_test
+ASSOCTEST := $(BUILD_DIR)/out/assoc_test
+
+vpath %.c third_party/hostap/src/common third_party/mbedtls/library $(COMPAT89_DIR)
+
+$(BUILD_DIR)/sae/%.o: %.c
+	@mkdir -p $(dir $@) $(BUILD_DIR)/log
+	@echo "  CC   sae/$*.c"
+	@$(CC) $(SAE_KFLAGS) -c $< -o $@ 2> $(BUILD_DIR)/log/sae_$*.log || { cat $(BUILD_DIR)/log/sae_$*.log >&2; exit 1; }
+
+# The SAE exchange in userspace, both sides (tools/hosttest/sae_test.c).
+saetest:
+	@mkdir -p $(BUILD_DIR)/out $(BUILD_DIR)/log
+	@cc -O1 -g -w $(SAE_INC) $(SAE_SRCS) $(COMPAT89_DIR)/rtw89_crypto.c tools/hosttest/sae_test.c \
+	    -o $(SAETEST) 2> $(BUILD_DIR)/log/sae_test_build.log \
+	    || { grep -E 'error' $(BUILD_DIR)/log/sae_test_build.log >&2; exit 1; }
+	$(call hostrun,$(SAETEST),,sae_test)
+
+hosttest: link
+	@cc -c -O1 -g -Wall -o $(BUILD_DIR)/out/host_kernel.o tools/hosttest/host_kernel.c
+	@cc -c -O1 -g -Wall -DOWLY_NATIVE_PEER_DATA=$(OWLY_NATIVE_PEER_DATA) -I$(COMPAT89_DIR) -o $(BUILD_DIR)/out/host_main.o tools/hosttest/host_main.c
+	@$(CC) $(DRIVER_CFLAGS) -MF /dev/null -c tools/hosttest/selftest.c -o $(BUILD_DIR)/out/selftest.o 2> $(BUILD_DIR)/log/hosttest_selftest.log \
+	    || { grep -E 'error' $(BUILD_DIR)/log/hosttest_selftest.log >&2; exit 1; }
+	@$(CC) $(DRIVER_CFLAGS) -MF /dev/null -c tools/hosttest/fakechip_core.c -o $(BUILD_DIR)/out/fakechip_core.o 2> $(BUILD_DIR)/log/hosttest_fakechip_core.log \
+	    || { grep -E 'error' $(BUILD_DIR)/log/hosttest_fakechip_core.log >&2; exit 1; }
+	@cc $(ARCH) -o $(HOSTTEST) $(HOST_OBJS) $(LINKED_OBJ) -lz
+	@cc $(ARCH) -o $(HOSTTEST)_fakechip $(HOST_OBJS) $(BUILD_DIR)/out/fakechip_core.o \
+	    $(filter-out $(BUILD_DIR)/compat_rtw89/rtw89_core_wrap.o,$(ALL_OBJS)) -lz
+	$(call hostrun,$(HOSTTEST),00,hosttest_00)
+	$(call hostrun,$(HOSTTEST),ff,hosttest_ff)
+	@# the other chips against a dead device, side by side (each waits out
+	@# the chip's power-on timeouts): probe must fail cleanly
+	@for id in $(OTHER_CHIP_IDS); do for fill in 00 ff; do \
+	    perl -e 'alarm 600; exec @ARGV' $(HOSTTEST) $$fill dead $$id \
+	        > $(BUILD_DIR)/log/hosttest_$${id}_$$fill.log 2>&1 \
+	        || echo "  hosttest FAILED for 10ec:$$id ($$fill), see $(BUILD_DIR)/log/hosttest_$${id}_$$fill.log" \
+	        > $(BUILD_DIR)/log/hosttest_$${id}_$$fill.failed & \
+	done; done; wait
+	@for id in $(OTHER_CHIP_IDS); do \
+	    echo "  RUN  10ec:$$id dead device: probe returned $$(grep -m1 'probe returned' $(BUILD_DIR)/log/hosttest_$${id}_00.log | sed 's/.*probe returned //')"; \
+	done
+	@if ls $(BUILD_DIR)/log/hosttest_*.failed >/dev/null 2>&1; then \
+	    cat $(BUILD_DIR)/log/hosttest_*.failed; rm -f $(BUILD_DIR)/log/hosttest_*.failed; exit 1; fi
+	$(call hostrun,$(HOSTTEST)_fakechip,00 ok,hosttest_fakechip)
+	@cc -c -O1 -g -w $(filter-out -DMBEDTLS%,$(SAE_INC)) tools/hosttest/sae_test.c -o $(BUILD_DIR)/out/sae_test_main.o
+	@cc $(ARCH) -o $(SAETEST)_kernel $(BUILD_DIR)/out/sae_test_main.o $(SAE_KOBJS) \
+	    $(BUILD_DIR)/fw/rtw89_crypto.o $(BUILD_DIR)/out/host_kernel.o
+	$(call hostrun,$(SAETEST)_kernel,,sae_test_kernel)
+	@# the join request decoding the kext uses (src/kext/rtw89_host_assoc.h)
+	@cc -O1 -g -Wall -Isrc/kext -o $(ASSOCTEST) tools/hosttest/assoc_test.c
+	$(call hostrun,$(ASSOCTEST),,assoc_test)
+
+# ------------------------------------------------------------------ #
+# Kext bundle                                                          #
+# ------------------------------------------------------------------ #
+
+# IOKit side: C++ against MacKernelSDK only. It talks to the Linux side through
+# src/compat_rtw89/rtw89_glue.h and never sees the compat headers.
+KEXT_SRC      := $(PROJ_ROOT)/src/kext
+KEXT_CXXFLAGS := -DOWLY_NATIVE_PEER_DATA=$(OWLY_NATIVE_PEER_DATA) -DOWLY_AWDL_SERVICE_LIFECYCLE=$(OWLY_AWDL_SERVICE_LIFECYCLE) -DOWLY_AWDL_SOFTWARE_SYNC=$(OWLY_AWDL_SOFTWARE_SYNC) -DOWLY_ABI6_GET117_CONTRACT=$(OWLY_ABI6_GET117_CONTRACT) -DOWLY_ABI6_C3_SCAN_OBSERVER=$(OWLY_ABI6_C3_SCAN_OBSERVER) -DOWLY_ABI6_FRONT_BRIDGE=$(OWLY_ABI6_FRONT_BRIDGE) -DOWLY_BACKEND_REAL_VIF=$(OWLY_BACKEND_REAL_VIF) $(ARCH) $(MINOS) -isysroot $(SDK) -nostdinc \
+                 -std=gnu++17 -O2 -fno-strict-aliasing -mkernel -fapple-kext -fno-rtti \
+                 -fno-exceptions \
+                 -fno-builtin -fno-common -fno-stack-protector \
+                 -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT \
+                 -D__PRIVATE_SPI__ -D__IO80211_TARGET=__MAC_13_0 \
+                 -I$(MKSDK)/Headers -I$(COMPAT89_DIR) -Wall -MMD -MP
+KEXT_OBJS     := $(BUILD_DIR)/kext/AirPortRTW89.o $(BUILD_DIR)/kext/AirPortRTW89Native.o \
+                 $(BUILD_DIR)/kext/rtw89_logring.o \
+                 $(BUILD_DIR)/kext/kmod_info.o
+KEXT_BUNDLE   := $(BUILD_DIR)/out/AirPort_RTW89.kext
+KEXT_BIN      := $(KEXT_BUNDLE)/Contents/MacOS/AirPort_RTW89
+
+$(BUILD_DIR)/kext/%.o: $(KEXT_SRC)/%.cpp
+	@mkdir -p $(dir $@)
+	@echo "  CXX  kext/$*.cpp"
+	@$(CXX) $(KEXT_CXXFLAGS) $(LOGRING_DEF) -c $< -o $@
+
+$(BUILD_DIR)/kext/%.o: $(KEXT_SRC)/%.c
+	@mkdir -p $(dir $@)
+	@echo "  CC   kext/$*.c"
+	@$(CC) $(FW_CFLAGS) -c $< -o $@
+
+# The front: the IO80211Controller, injected by OpenCore (src/front/rtw89_front_api.h).
+FRONT_SRC    := $(PROJ_ROOT)/src/front
+# OWLY_NATIVEFRONT_VIF_OBSERVER_BEGIN: 0 preserves the existing frontend.
+RTW89_AWDL_NATIVE_FRONT_OBSERVE ?= 0
+# RC3: creation is separately opt-in; default "make front" must be fail-closed.
+OWLY_GATE14_REAL_VIF ?= 0
+# ABI6 native P2P subclass test, only after Cap12 virtual GET bridge.
+# Source-only opt-in. Does not create AWDL data path or enable TX.
+OWLY_ABI6_NATIVE_P2P_FACTORY ?= 0
+ifneq ($(filter-out 0 1,$(OWLY_ABI6_NATIVE_P2P_FACTORY)),)
+$(error OWLY_ABI6_NATIVE_P2P_FACTORY must be 0 or 1)
+endif
+ifeq ($(OWLY_ABI6_NATIVE_P2P_FACTORY),1)
+ifneq ($(OWLY_GATE14_REAL_VIF),1)
+$(error ABI6 P2P subclass requires Gate14 real VIF=1)
+endif
+ifneq ($(OWLY_BACKEND_REAL_VIF),1)
+$(error ABI6 P2P subclass requires real backend VIF=1)
+endif
+ifneq ($(RTW89_AWDL_NATIVE_FRONT_OBSERVE),1)
+$(error ABI6 P2P subclass requires native lifecycle observation=1)
+endif
+endif
+# OWLY_NATIVEFRONT_VIF_OBSERVER_END
+ifeq ($(OWLY_GATE14_REAL_VIF),1)
+ifneq ($(OWLY_BACKEND_REAL_VIF),1)
+$(error Armed Gate14 front requires OWLY_BACKEND_REAL_VIF=1; rebuild both kexts)
+endif
+ifneq ($(RTW89_AWDL_NATIVE_FRONT_OBSERVE),1)
+$(error Armed Gate14 front requires native lifecycle=1)
+endif
+endif
+ifeq ($(OWLY_BACKEND_REAL_VIF),1)
+ifneq ($(OWLY_GATE14_REAL_VIF),1)
+$(error Real backend VIF requires armed Gate14 frontend in matching build)
+endif
+endif
+FRONT_BUNDLE := $(BUILD_DIR)/out/AirPortRTW89Front.kext
+front:
+	@rm -rf $(FRONT_BUNDLE)
+	@mkdir -p $(FRONT_BUNDLE)/Contents/MacOS $(BUILD_DIR)/front
+	@cp $(FRONT_SRC)/Info.plist $(FRONT_BUNDLE)/Contents/Info.plist
+	@echo "  CXX  front/AirPortRTW89Front.cpp"
+	@$(CXX) $(KEXT_CXXFLAGS) -D__IO80211_TARGET=__MAC_13_0 -Wno-inconsistent-missing-override \
+	    -DRTW89_AWDL_NATIVE_FRONT_OBSERVE=$(RTW89_AWDL_NATIVE_FRONT_OBSERVE) \
+	    -DOWLY_GATE14_REAL_VIF=$(OWLY_GATE14_REAL_VIF) \
+	    -DOWLY_ABI6_NATIVE_P2P_FACTORY=$(OWLY_ABI6_NATIVE_P2P_FACTORY) \
+	    -c $(FRONT_SRC)/AirPortRTW89Front.cpp -o $(BUILD_DIR)/front/AirPortRTW89Front.o
+	@$(CC) $(FW_CFLAGS) -c $(FRONT_SRC)/kmod_info.c -o $(BUILD_DIR)/front/kmod_info.o
+	@$(CXX) $(ARCH) $(MINOS) -isysroot $(SDK) -nostdlib -Xlinker -kext \
+	    -L$(MKSDK)/Library/x86_64 $(BUILD_DIR)/front/AirPortRTW89Front.o \
+	    $(BUILD_DIR)/front/kmod_info.o -lkmod -lcc_kext \
+	    -o $(FRONT_BUNDLE)/Contents/MacOS/AirPortRTW89Front
+	@codesign --force --sign - $(FRONT_BUNDLE) 2>/dev/null || true
+	@echo "  KEXT $(FRONT_BUNDLE)"
+
+# A kext that does nothing but depend on IO80211FamilyLegacy, for tools/deptest.sh.
+DEPTEST_BUNDLE := $(BUILD_DIR)/out/RTW89DepTest.kext
+deptest:
+	@rm -rf $(DEPTEST_BUNDLE)
+	@mkdir -p $(DEPTEST_BUNDLE)/Contents/MacOS $(BUILD_DIR)/kext
+	@cp tools/deptest/Info.plist $(DEPTEST_BUNDLE)/Contents/Info.plist
+	@$(CC) $(FW_CFLAGS) -c tools/deptest/deptest.c -o $(BUILD_DIR)/kext/deptest.o
+	@$(CXX) $(ARCH) $(MINOS) -isysroot $(SDK) -nostdlib -Xlinker -kext \
+	    -L$(MKSDK)/Library/x86_64 $(BUILD_DIR)/kext/deptest.o -lkmod -lcc_kext \
+	    -o $(DEPTEST_BUNDLE)/Contents/MacOS/RTW89DepTest
+	@codesign --force --sign - $(DEPTEST_BUNDLE) 2>/dev/null || true
+	@echo "  KEXT $(DEPTEST_BUNDLE)"
+
+# The smoke test gates the bundle: nothing gets packaged that crashed there.
+kext: hosttest $(KEXT_OBJS) $(KEXT_SRC)/Info.plist
+	@rm -rf $(BUILD_DIR)/out/AirPort_RTW89.kext
+	@mkdir -p $(dir $(KEXT_BIN))
+	@cp $(KEXT_SRC)/Info.plist $(KEXT_BUNDLE)/Contents/Info.plist
+	@$(CXX) $(ARCH) $(MINOS) -isysroot $(SDK) -nostdlib -Xlinker -kext \
+	    -L$(MKSDK)/Library/x86_64 $(ALL_OBJS) $(KEXT_OBJS) -lkmod -lcc_kext -o $(KEXT_BIN)
+	@codesign --force --sign - $(KEXT_BUNDLE) 2>/dev/null || true
+	@echo "  KEXT $(KEXT_BUNDLE)"
+	@python3 tools/check_kpi.py $(KEXT_BUNDLE)
+	@cc -O2 -Wall -o $(BUILD_DIR)/out/rtw89ctl tools/rtw89ctl.c -framework IOKit -framework CoreFoundation
+	@echo "  TOOL $(BUILD_DIR)/out/rtw89ctl"
+
+# Realtek's firmware for each chip, the newest format its driver takes, and
+# Realtek's terms for redistributing it; linux-firmware at a fixed commit.
+FW_COMMIT := d947e4e8e314e9254a1242dc1a5d9cede2cce33d
+FW_NAMES  := rtw8851b_fw-1.bin rtw8852a_fw-1.bin rtw8852b_fw-2.bin rtw8852bt_fw.bin \
+             rtw8852c_fw-2.bin rtw8922a_fw-4.bin rtw8922d_fw.bin rtw8922ds_fw.bin
+FW_BASE   := https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain
+
+fetch-firmware:
+	@mkdir -p $(FIRMWARE_DIR)
+	@for f in $(FW_NAMES); do \
+	    echo "  GET  rtw89/$$f"; \
+	    curl -fsSL -m 300 --output $(FIRMWARE_DIR)/$$f "$(FW_BASE)/rtw89/$$f?id=$(FW_COMMIT)" || exit 1; \
+	done
+	@curl -fsSL -m 60 --output $(FIRMWARE_DIR)/LICENCE.rtlwifi_firmware.txt \
+	    "$(FW_BASE)/LICENSES/LICENCE.rtlwifi_firmware.txt?id=$(FW_COMMIT)"
+	@cd $(FIRMWARE_DIR) && shasum -a 256 -c SHA256SUMS
+
+# The kext as it is installed: the driver, with the front inside it as a
+# plugin (OpenCore loads Contents/PlugIns/ kexts as entries of their own, after
+# IO80211FamilyLegacy) and the licences that must travel with the firmware and
+# the GPL code in Contents/Resources. build/out/bundle/AirPort_RTW89.kext.
+BUNDLE := $(BUILD_DIR)/out/bundle/AirPort_RTW89.kext
+
+bundle: kext front
+	@rm -rf $(BUNDLE)
+	@mkdir -p $(dir $(BUNDLE))
+	@cp -R $(BUILD_DIR)/out/AirPort_RTW89.kext $(BUNDLE)
+	@mkdir -p $(BUNDLE)/Contents/PlugIns $(BUNDLE)/Contents/Resources
+	@cp -R $(BUILD_DIR)/out/AirPortRTW89Front.kext $(BUNDLE)/Contents/PlugIns/
+	@cp LICENSE CREDITS.md $(FIRMWARE_DIR)/LICENCE.rtlwifi_firmware.txt $(BUNDLE)/Contents/Resources/
+	@git rev-parse --short HEAD > $(BUNDLE)/Contents/Resources/COMMIT
+	@# the front must start before the driver on the card (see its Info.plist)
+	@f=$$(/usr/libexec/PlistBuddy -c 'Print :IOKitPersonalities:RTW89:IOProbeScore' $(BUNDLE)/Contents/PlugIns/AirPortRTW89Front.kext/Contents/Info.plist 2>/dev/null || echo 0); \
+	 d=$$(/usr/libexec/PlistBuddy -c 'Print :IOKitPersonalities:RTW89:IOProbeScore' $(BUNDLE)/Contents/Info.plist 2>/dev/null || echo 0); \
+	 [ "$$f" -gt "$$d" ] || { echo "  the front's IOProbeScore ($$f) must be above the driver's ($$d)"; exit 1; }
+	@echo "  BUNDLE $(BUNDLE) (the front in Contents/PlugIns)"
+
+# The downloads: AirPort_RTW89-<version>.zip, the kext and next to it the
+# Kext Installer (.command for macOS, .cmd for Windows, .sh for Linux, and the
+# .py they run, with efi/configure.py built in); and
+# AirPort_RTW89-<version>-tools.zip for testers: efi/install.sh (not
+# efi/tuf-a15/, this machine's own), rtw89ctl, the log collector, README and
+# TESTING.md. The old Wi-Fi stack is not Apple's to give away here.
+VERSION     := $(shell /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' src/kext/Info.plist)
+RELEASE     := AirPort_RTW89-$(VERSION)
+TOOLS       := $(RELEASE)-tools
+TOOLS_DIR   := $(BUILD_DIR)/release/$(TOOLS)
+KEXT_DIR    := $(BUILD_DIR)/release/$(RELEASE)
+
+release: bundle
+	@rm -rf $(BUILD_DIR)/release
+	@mkdir -p $(KEXT_DIR) $(TOOLS_DIR)/efi/kit $(TOOLS_DIR)/tools
+	@# the kext and, next to it, the installer for each OS
+	@cp -R $(BUNDLE) $(KEXT_DIR)/
+	@python3 tools/embed_installer.py "$(KEXT_DIR)/Kext Installer.py"
+	@cp "installer/Kext Installer.command" "installer/Kext Installer.cmd" "installer/Kext Installer.sh" $(KEXT_DIR)/
+	@chmod +x "$(KEXT_DIR)/Kext Installer.command" "$(KEXT_DIR)/Kext Installer.sh" "$(KEXT_DIR)/Kext Installer.py"
+	@cp efi/install.sh efi/uninstall.sh efi/configure.py efi/find_efi.sh efi/README.md $(TOOLS_DIR)/efi/
+	@printf 'Put IOSkywalkFamily.kext, IO80211FamilyLegacy.kext and AMFIPass.kext here:\nsee ../README.md, "Requirements".\n' > $(TOOLS_DIR)/efi/kit/PUT-KEXTS-HERE.txt
+	@printf 'Put AirPort_RTW89.kext (from %s.zip) in this folder for efi/install.sh.\n' $(RELEASE) > $(TOOLS_DIR)/PUT-AirPort_RTW89.kext-HERE.txt
+	@cp $(BUILD_DIR)/out/rtw89ctl tools/collect_logs.sh $(TOOLS_DIR)/tools/
+	@cp README.md TESTING.md LICENSE $(TOOLS_DIR)/
+	@find $(BUILD_DIR)/release -name '.DS_Store' -delete
+	@cd $(KEXT_DIR) && COPYFILE_DISABLE=1 zip -qry ../$(RELEASE).zip .
+	@cd $(BUILD_DIR)/release && COPYFILE_DISABLE=1 zip -qry $(TOOLS).zip $(TOOLS)
+	@echo "  ZIP  $(BUILD_DIR)/release/$(RELEASE).zip ($$(du -h $(BUILD_DIR)/release/$(RELEASE).zip | cut -f1)): AirPort_RTW89.kext and the Kext Installer, commit $$(cat $(BUNDLE)/Contents/Resources/COMMIT)"
+	@echo "  ZIP  $(BUILD_DIR)/release/$(TOOLS).zip ($$(du -h $(BUILD_DIR)/release/$(TOOLS).zip | cut -f1))"
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+-include $(ALL_OBJS:.o=.d) $(KEXT_OBJS:.o=.d)

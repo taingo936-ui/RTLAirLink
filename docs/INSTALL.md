@@ -4,6 +4,8 @@ This build targets RTL8852BE on Intel/x86_64 macOS build `25G241`. It relies on 
 
 ## Dependencies
 
+Start with [DEPENDENCIES.md](DEPENDENCIES.md): it provides the three pinned upstream downloads, the included download helper, and the complete manual OpenCore steps from AirPort_RTW89 adapted to the renamed paired bundles.
+
 Provide your own compatible OpenCore installation and dependencies. The development setup used Lilu 1.7.3, the appropriate IOSkywalkFamily/IO80211FamilyLegacy arrangement, AMFIPass and working Realtek Bluetooth firmware/BlueToolFixup. Their required system configuration depends on the OS and is not supplied as a personal EFI here.
 
 The bridge pins IO80211FamilyLegacy UUID `4C07538B-62EB-3D6D-AEF9-93BCDCF45FAB` (executable SHA256 `ac2dc15b77f8eaf97b71b34c5d0e1b59f862bfeac618396449306e1837e73894`) and validates instruction prefixes at runtime. Different images must not be treated as compatible merely because the filenames match. The bridge also pins the frontend UUID of its build cohort.

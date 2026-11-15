@@ -2,11 +2,11 @@
 
 ## Research baseline
 
-Fix45 completed file transfers in both directions over real AWDL in development testing. Waiting and disappearing discovery targets recurred; that result is not a stability qualification.
+Earlier development testing completed file transfers in both directions over real AWDL in development testing. Waiting and disappearing discovery targets recurred; that result is not a stability qualification.
 
-Fix46's late-slot reply and dynamic BlockAck CAM regressions failed against unchanged Fix45 source and passed after the fixes. Normal and ASan/UBSan execution passed. The research Python suite reported 205 passes and one optional historic-fixture skip out of 206 tests.
+The late-slot reply and dynamic BlockAck CAM regressions failed against the preceding source and passed after the fixes. Normal and ASan/UBSan execution passed. The research Python suite reported 205 passes and one optional historic-fixture skip out of 206 tests.
 
-The complete research build passed four runs of 12 software-AWDL checks and four runs of 28 SCC-lifecycle checks, plus import, compiled-vtable and signature validation. Its backend UUID was observed loaded after reboot. Full bridge activation and repeated real-world two-way tests for Fix46 remain pending.
+The complete research build passed four runs of 12 software-AWDL checks and four runs of 28 SCC-lifecycle checks, plus import, compiled-vtable and signature validation. Its backend UUID was observed loaded after reboot. Full bridge activation and repeated real-world two-way tests for the new cohort remain pending.
 
 ## Publication build
 

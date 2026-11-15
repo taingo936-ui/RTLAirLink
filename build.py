@@ -138,15 +138,18 @@ def assemble(work, bridge, output, report):
     (assembly / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')
     shutil.copy(ROOT / 'LICENSE', assembly / 'LICENSE')
     shutil.copytree(ROOT / 'LICENSES', assembly / 'LICENSES')
-    for name in ['CREDITS.md', 'docs/INSTALL.md']:
+    for name in ['CREDITS.md', 'docs/INSTALL.md', 'docs/DEPENDENCIES.md',
+                 'DEPENDENCIES.json', 'Download-Dependencies.command']:
         shutil.copy(ROOT / name, assembly / Path(name).name)
+    (assembly / 'tools').mkdir()
+    shutil.copy(ROOT / 'tools/download_dependencies.py', assembly / 'tools/download_dependencies.py')
     verified = output / 'VERIFIED_KEXTS'
     assembly.rename(verified)
-    with zipfile.ZipFile(output / 'RTLAirLink-Fix46-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output / 'RTLAirLink-v0.1.0-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(verified.rglob('*')):
             if path.is_file():
-                archive.write(path, 'RTLAirLink-Fix46/' + path.relative_to(verified).as_posix())
-    with zipfile.ZipFile(output / 'RTLAirLink-Fix46-x86_64.zip') as archive:
+                archive.write(path, 'RTLAirLink-v0.1.0/' + path.relative_to(verified).as_posix())
+    with zipfile.ZipFile(output / 'RTLAirLink-v0.1.0-x86_64.zip') as archive:
         require(archive.testzip() is None, 'Release ZIP CRC check failed')
 
 
@@ -162,7 +165,7 @@ def main():
     require(version == CONFIG['macos_build'], 'Build is pinned to macOS ' + CONFIG['macos_build'])
     output = ROOT / 'build' / datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     output.mkdir(parents=True)
-    report = {'status': 'INCOMPLETE', 'profile': 'Fix46', 'project': 'RTLAirLink',
+    report = {'status': 'INCOMPLETE', 'profile': 'RTLAirLink', 'release_version': '0.1.0', 'project': 'RTLAirLink',
               'macos_build': version, 'architecture': platform.machine(),
               'front_back_abi': 7, 'installed': False, 'efi_modified': False,
               'runtime_airdrop_verified': False,
@@ -204,7 +207,7 @@ def main():
         report.update(status='BUILD_FAILED', error=str(error))
         for folder in ('assembly', 'VERIFIED_KEXTS'):
             shutil.rmtree(output / folder, ignore_errors=True)
-        (output / 'RTLAirLink-Fix46-x86_64.zip').unlink(missing_ok=True)
+        (output / 'RTLAirLink-v0.1.0-x86_64.zip').unlink(missing_ok=True)
         raise
     finally:
         (output / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')

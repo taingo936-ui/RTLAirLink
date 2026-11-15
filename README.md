@@ -13,11 +13,11 @@ The output directories and display metadata use the new branding. CFBundleName/C
 
 ## Status
 
-**Experimental Fix46; not a stable general-purpose AirDrop release.**
+**RTLAirLink v0.1.0 — experimental; not a stable general-purpose AirDrop release.**
 
 - Development target: RTL8852BE, Intel/x86_64 macOS build `25G241` and the exact Legacy Wi-Fi ABI described in [installation notes](docs/INSTALL.md).
-- Earlier Fix45 testing completed real file transfers in both directions over AWDL. Intermittent discovery, missing endpoints and long Waiting remained.
-- Fix46 corrects dynamic BlockAck CAM fallback and the scheduling gate for BlockAck replies. Source tests, sanitizer checks, native compilation, import checks and signatures passed in the research build. Its backend was observed loaded after reboot; full bridge activation and repeated two-way stability tests remain pending.
+- Earlier development testing completed real file transfers in both directions over AWDL. Intermittent discovery, missing endpoints and long Waiting remained.
+- This release corrects dynamic BlockAck CAM fallback and the scheduling gate for BlockAck replies. Source tests, sanitizer checks, native compilation, import checks and signatures passed in the research build. Its backend was observed loaded after reboot; full bridge activation and repeated two-way stability tests remain pending.
 - Single-channel AP/AWDL coexistence and approximate radio timing remain limitations. Compilation or signing does not establish working AirDrop on another machine.
 
 Other PCI IDs present in inherited source are not a claim of tested support. Apple Silicon is not supported by this build.
@@ -25,6 +25,8 @@ Other PCI IDs present in inherited source are not a claim of tested support. App
 ## Downloads and installation
 
 Use the paired ZIP from [GitHub Releases](https://github.com/taingo936-ui/RTLAirLink/releases). Read [INSTALL.md](docs/INSTALL.md) before changing OpenCore. Apple Wi-Fi system kexts, Bluetooth drivers, Lilu, AMFIPass and a personal EFI/config are not included in the release.
+
+As in the [upstream installer guide](https://github.com/FranciumOS-org/AirPort_RTW89#requirements), install **IOSkywalkFamily, IO80211FamilyLegacy and AMFIPass**, plus Lilu. The release includes `Download-Dependencies.command`, pinned download hashes and the [complete dependency/setup guide](docs/DEPENDENCIES.md), including the system-Skywalk block and Tahoe boot argument.
 
 ## Build from source
 

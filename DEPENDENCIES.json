@@ -1,0 +1,41 @@
+{
+  "upstream_guide": "https://github.com/FranciumOS-org/AirPort_RTW89/blob/main/README.md",
+  "provider_repository": "dortania/OpenCore-Legacy-Patcher",
+  "provider_commit": "d9604c36a432eaf243ea18659ff4d208187452d7",
+  "note": "External dependencies identified by the upstream installation guide; not redistributed in the RTLAirLink binary/source archive. Download directly from the pinned provider URLs.",
+  "dependencies": [
+    {
+      "bundle": "IOSkywalkFamily.kext",
+      "filename": "IOSkywalkFamily-v1.2.0.zip",
+      "url": "https://raw.githubusercontent.com/dortania/OpenCore-Legacy-Patcher/d9604c36a432eaf243ea18659ff4d208187452d7/payloads/Kexts/Wifi/IOSkywalkFamily-v1.2.0.zip",
+      "sha256": "1e12b7ef42f55b39ea54ada97b46331220668b2c48a28656e9875c5145fe2479",
+      "size": 193303,
+      "bundle_identifier": "com.apple.iokit.IOSkywalkFamily",
+      "bundle_version": "1.0",
+      "executable_sha256": "0484ecd97d1bdb8759aef72661c196cda4309697eea1945a4a3c4d5e6d7e5e5b",
+      "executable_uuid_description": "UUID: 035A9AD9-6CDE-362F-8DEC-B664BC6431EC (x86_64)"
+    },
+    {
+      "bundle": "IO80211FamilyLegacy.kext",
+      "filename": "IO80211FamilyLegacy-v1.0.0.zip",
+      "url": "https://raw.githubusercontent.com/dortania/OpenCore-Legacy-Patcher/d9604c36a432eaf243ea18659ff4d208187452d7/payloads/Kexts/Wifi/IO80211FamilyLegacy-v1.0.0.zip",
+      "sha256": "e681dcc76a2cd2cea4b0ad5f27a3c816055fde3cdccd890dd10a3e2c84e96d93",
+      "size": 4747179,
+      "bundle_identifier": "com.apple.iokit.IO80211FamilyLegacy",
+      "bundle_version": "1200.12.2b1",
+      "executable_sha256": "ac2dc15b77f8eaf97b71b34c5d0e1b59f862bfeac618396449306e1837e73894",
+      "executable_uuid_description": "UUID: 4C07538B-62EB-3D6D-AEF9-93BCDCF45FAB (x86_64)"
+    },
+    {
+      "bundle": "AMFIPass.kext",
+      "filename": "AMFIPass-v1.4.1-RELEASE.zip",
+      "url": "https://raw.githubusercontent.com/dortania/OpenCore-Legacy-Patcher/d9604c36a432eaf243ea18659ff4d208187452d7/payloads/Kexts/Acidanthera/AMFIPass-v1.4.1-RELEASE.zip",
+      "sha256": "07b266145906db41f4b13a7938fbb173ea28888cc1fa65f84417f8820adc961e",
+      "size": 191154,
+      "bundle_identifier": "com.dhinakg.AMFIPass",
+      "bundle_version": "1.4.1",
+      "executable_sha256": "4c35bc196d35c69b5f9dca83fe733801211c7828716f51585c7f5450039ca884",
+      "executable_uuid_description": "UUID: 7DF1CDFC-7EFE-3D82-A3A2-7DACE8B1D097 (x86_64)"
+    }
+  ]
+}

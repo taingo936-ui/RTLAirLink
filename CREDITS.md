@@ -1,6 +1,6 @@
 # Credits and provenance
 
-RTLAirLink is a renamed distribution of the experimental Owly Fix46 development line derived from [FranciumOS AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89). It is not a claim of sole authorship of the inherited Wi-Fi driver. Original source notices remain in place.
+RTLAirLink is a renamed distribution of the experimental Owly development work derived from [FranciumOS AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89). It is not a claim of sole authorship of the inherited Wi-Fi driver. Original source notices remain in place.
 
 - **Realtek and Linux wireless developers**: Linux rtw89 and Linux networking headers. The vendored driver includes local AWDL/filter integration changes; see source and MODIFICATIONS.md.
 - **AirPort_RTW89, AirPort_RTW88 and Realtek-AirPort-Family contributors**: macOS port foundations, compatibility shims and Wi-Fi glue.

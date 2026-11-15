@@ -1622,7 +1622,7 @@
     "_strcmp",
     "_strncmp"
   ],
-  "profile": "Fix46",
+  "profile": "RTLAirLink",
   "macos_build": "25G241",
   "architecture": "x86_64",
   "legacy_uuid": "4C07538B-62EB-3D6D-AEF9-93BCDCF45FAB",
@@ -1630,5 +1630,6 @@
     "backend": "RTLAirLink.kext",
     "frontend": "AirPortRTW89Front.kext",
     "bridge": "RTLAirBridge.kext"
-  }
+  },
+  "release_version": "0.1.0"
 }

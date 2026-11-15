@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: Fix46 BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
+/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
 #ifndef OWLY_NATIVE_LINK_H
 #define OWLY_NATIVE_LINK_H
 #include <stdbool.h>

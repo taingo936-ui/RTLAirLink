@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: Fix46 BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
+/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
 /* Real observed AWDL radio peers. Wiphy owns CAM/firmware; RX only queues
  * control requests or packet ownership. No AP join, TDLS, synthetic TCP/TLS. */
 #include "owly_awdl_ba.h"

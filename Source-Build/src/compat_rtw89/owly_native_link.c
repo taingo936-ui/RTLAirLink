@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: Fix46 BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
+/* SPDX-License-Identifier: GPL-2.0 */ /* Modified 2026-11-15: BlockAck reply/dynamic-CAM fixes; see MODIFICATIONS.md. */
 #include "owly_native_link.h"
 #include "owly_native_scan_policy.h"
 #include "rtw89_awdl_action_decode.h"

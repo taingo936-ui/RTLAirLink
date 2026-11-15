@@ -14,6 +14,7 @@ build_main() (
     set -euo pipefail
     cd "$KIT_DIR"
     PYTHON="$(command -v python3)"
+    RELEASE_VERSION="$("$PYTHON" -c 'import plistlib; print(plistlib.load(open("Info.plist", "rb"))["CFBundleVersion"])')"
     "$PYTHON" tools/verify_source.py
     "$PYTHON" tools/audit_lifecycle.py
     "$PYTHON" tools/check_build_host.py --report-dir "$OUT_DIR/report" "$@"
@@ -76,7 +77,7 @@ build_main() (
         -O2 -fno-strict-aliasing -fwrapv -mkernel -fno-exceptions
         -fno-builtin -fno-common -fno-stack-protector -fno-omit-frame-pointer
         -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT -D__PRIVATE_SPI__
-        -DPRODUCT_NAME=OwlyAirLinkBridge -DMODULE_VERSION=0.1.11 -DLILU_CUSTOM_KMOD_INIT=1 -DLILU_CUSTOM_IOKIT_INIT=1
+        -DPRODUCT_NAME=OwlyAirLinkBridge -DMODULE_VERSION="$RELEASE_VERSION" -DLILU_CUSTOM_KMOD_INIT=1 -DLILU_CUSTOM_IOKIT_INIT=1
         -Wall -Wextra -Wframe-larger-than=1024)
     CXX=(-std=gnu++17 -fapple-kext -fno-rtti)
     OBJS="$OUT_DIR/objects"
@@ -135,7 +136,7 @@ else
     printf '%s\n' 'BUILD_OR_PREFLIGHT_FAILED' > "$OUT_DIR/STATUS.txt"
 fi
 printf '%s\n' \
-    'Send this native build ZIP for review of the new 0.1.11 binary before a USB boot test.' \
+    'Review this newly compiled bridge before a boot test.' \
     'No kext was loaded. Runtime interoperability and AirDrop are NOT proven.' \
     > "$OUT_DIR/READ_ME_FIRST.txt"
 # Object files and the host executable are intermediate, not useful for review.

@@ -34,7 +34,7 @@ Restart after installation and check the loaded bundle IDs/UUIDs against `BUILD_
 
 ## Display names
 
-The new metadata advertises `RTLAirLink`, `RTLAirLinkFront` and `RTLAirBridge` as bundle display names. Wi-Fi driver-version reporting changes to `<detected chip> (RTLAirLink 0.5.0)`, while the controller model string changes to `RTLAirLink (<detected chip>)`. The vendor remains Realtek and the hardware-version field remains the actual chip model. The exact System Information presentation must be verified after installing and rebooting this build; macOS may cache labels or show hardware fields separately.
+The new metadata advertises `RTLAirLink`, `RTLAirLinkFront` and `RTLAirBridge` as bundle display names. Wi-Fi driver-version reporting changes to `<detected chip> (RTLAirLink 0.1.0)`, while the controller model string changes to `RTLAirLink (<detected chip>)`. The vendor remains Realtek and the hardware-version field remains the actual chip model. The exact System Information presentation must be verified after installing and rebooting this build; macOS may cache labels or show hardware fields separately.
 
 Low-level bundle IDs such as `com.rtw89.driver`, `com.rtw89.front` and `com.owly.airlink.eventbridge`, executable names and IOService class names are intentionally retained for compatibility. Seeing those identifiers in detailed diagnostics is expected.
 

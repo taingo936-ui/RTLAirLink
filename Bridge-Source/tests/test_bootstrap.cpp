@@ -55,7 +55,7 @@ int main() {
  reset();enter();assert(requested==1&&loaded==1&&released==1&&started==1);
  assert(OwlyAirLinkBridge_kern_stop(nullptr,nullptr)==KERN_FAILURE);
  {OwlyAirLinkBridge s;assert(s.start(&root));assert(loopsMade==1&&runtimeCalls==1);
-  assert(root.strings["OwlyEB1Version"]=="0.1.11");assert(root.flags["OwlyEB1ApiAccessReleased"]);
+  assert(root.strings["OwlyEB1Version"]=="0.1.0");assert(root.flags["OwlyEB1ApiAccessReleased"]);
   assert(root.flags["OwlyEB1RuntimeInitSucceeded"]);assert(lastTimer&&lastTimer->armed);
   assert(!s.start(&root));assert(loopsMade==1);
   OwlyStatus::flag("OwlyEB1HooksReady",true);lastTimer->fire();assert(root.flags["OwlyEB1HooksReady"]);
@@ -94,7 +94,7 @@ int main() {
  {OwlyAirLinkBridge s;assert(s.start(&root));fakeArm=false;lastTimer->fire();assert(deactivateCalls==1&&!lastTimer->armed);assert(!root.flags["OwlyEB1StatusTimerAvailable"]);cleanup(s);}
  std::cout<<"PASS timer re-arm failure cannot leave active unobserved runtime\n";
  reset();enter();fakeResource=false;
- {OwlyAirLinkBridge s;assert(s.start(&root));assert(s.strings["OwlyEB1Version"]=="0.1.11");cleanup(s);}
+ {OwlyAirLinkBridge s;assert(s.start(&root));assert(s.strings["OwlyEB1Version"]=="0.1.0");cleanup(s);}
  std::cout<<"PASS unavailable IOResources still publishes on service\n";
  reset();moduleReturned=true;root.clear();
  OwlyStatus::number("unknown",99);OwlyStatus::flag(nullptr,true);OwlyStatus::text("OwlyEB1Version",nullptr);

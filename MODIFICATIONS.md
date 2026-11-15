@@ -23,3 +23,7 @@ The two regression cases failed on the preceding source and passed after the fix
 - Exclude personal diagnostics, packet captures, EFI/configuration and Apple system binaries from the distribution. Dependency source, original notices and unchanged firmware remain included.
 
 Requested display branding also updates CFBundleName/CFBundleDisplayName in all three Info.plists, newModelString in backend/frontend (retaining the detected chip), APPLE80211_IOC_DRIVER_VERSION text, and the bridge VersionInfo property. These display changes are dated inline. Hardware-version reporting, vendor, class and bundle identifiers remain unchanged. System Information display must still be checked after booting the published binaries.
+
+## Version metadata correction — 2026-11-15
+
+Rebuilt v0.1.0 at the owner's request to replace the initially published archives. The Wi-Fi System Information string, backend/frontend/bridge bundle versions, module descriptors and bridge status now all report 0.1.0. Shared version headers keep display and module strings aligned; the builder rejects inconsistent source metadata and compiled module descriptors. The bridge is rebound to the newly compiled frontend UUID. Network behavior and bundle identifiers are unchanged. Release and package digests change; use the current checksums and replace both kexts together.

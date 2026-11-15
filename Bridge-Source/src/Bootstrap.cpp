@@ -9,6 +9,7 @@
 #include <Headers/kern_util.hpp>
 #include "OwlyStatus.hpp"
 #include "OwlyStartupPlan.hpp"
+#include "ReleaseVersion.hpp"
 
 OwlyStartupPlan owlyStartupPlan;
 
@@ -19,7 +20,7 @@ EXPORT extern "C" kern_return_t ADDPR(kern_start)(kmod_info_t *, void *)
 {
     ADDPR(startSuccess) = false;
     owlyStartupPlan.select(0);
-    OwlyStatus::text("OwlyEB1Version", "0.1.11");
+    OwlyStatus::text("OwlyEB1Version", RTLAIRLINK_VERSION);
     OwlyStatus::text("OwlyEB1BootstrapPhase", "module-entry");
     OwlyStatus::flag("OwlyEB1ModuleEntryReached", true);
     const bool optedIn = checkKernelArgument("-owlyeb1");

@@ -12,6 +12,7 @@
 #include "AirPortRTW89.hpp"
 #include "rtw89_chips.h"
 #include "rtw89_host_assoc.h"
+#include "../rtw89_release.h"
 
 #include <IOKit/80211/apple80211_ioctl.h>
 #include <IOKit/80211/apple80211_var.h>
@@ -1790,7 +1791,7 @@ int AirPort_RTW89::nativeRequest(bool isSet, int number, void *data)
         d->version = APPLE80211_VERSION;
         if (number == APPLE80211_IOC_DRIVER_VERSION)
             /* Modified 2026-11-15: System Information Wi-Fi driver label. */
-            snprintf(d->string, sizeof(d->string), "%s (RTLAirLink 0.5.0)",
+            snprintf(d->string, sizeof(d->string), "%s (RTLAirLink " RTLAIRLINK_VERSION ")",
                      rtw89_chip_name(_deviceID));
         else
             strlcpy(d->string, rtw89_chip_name(_deviceID), sizeof(d->string));

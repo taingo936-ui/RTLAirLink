@@ -6,6 +6,7 @@
 #include "OwlyRuntime.hpp"
 #include "OwlyStatus.hpp"
 #include "OwlyStartupPlan.hpp"
+#include "ReleaseVersion.hpp"
 
 extern bool ADDPR(startSuccess);
 
@@ -43,7 +44,7 @@ bool OwlyAirLinkBridge::start(IOService *provider)
     OwlyStatus::flag("OwlyEB1ServiceParentStarted", parent);
     if (!parent) { publish(); return false; }
     /* Modified 2026-11-15: display branding; service class/identity unchanged. */
-    setProperty("VersionInfo", "RTLAirBridge 0.1.11");
+    setProperty("VersionInfo", "RTLAirBridge " RTLAIRLINK_VERSION);
     publish();
     /* A refused/disabled bootstrap remains observable but allocates no loop,
      * registers no new callback and never exposes a modern client. */

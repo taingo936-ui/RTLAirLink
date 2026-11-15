@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = json.loads((ROOT / 'BUILD_CONFIG.json').read_text())
+RELEASE_VERSION = plistlib.loads((ROOT / 'Source-Build/src/kext/Info.plist').read_bytes())['CFBundleShortVersionString']
 CHECKS = ('ht', 'raw_tx', 'radio_timing', 'standalone', 'unicast', 'block_ack',
           'rx_filter', 'vif_restore', 'transport_wire', 'data_host', 'native_sync',
           'native_scan', 'native', 'service', 'control')
@@ -66,6 +67,16 @@ def run(command, log, cwd=None, env=None):
 
 
 def preflight(output):
+    require(re.fullmatch(r'\d+\.\d+\.\d+', RELEASE_VERSION), 'Invalid release version')
+    for name in ['Source-Build/src/kext/Info.plist', 'Source-Build/src/front/Info.plist',
+                 'Bridge-Source/Info.plist']:
+        info = plistlib.loads((ROOT / name).read_bytes())
+        require(info['CFBundleVersion'] == info['CFBundleShortVersionString'] == RELEASE_VERSION,
+                'Project bundle version differs: ' + name)
+    for name in ['Source-Build/src/rtw89_release.h', 'Bridge-Source/src/ReleaseVersion.hpp']:
+        require(re.findall(r'^#define RTLAIRLINK_VERSION "([^"]+)"$',
+                           (ROOT / name).read_text(), re.M) == [RELEASE_VERSION],
+                'Display/module version differs: ' + name)
     results = {}
     for name in CHECKS:
         print('Checking ' + name, flush=True)
@@ -127,12 +138,22 @@ def assemble(work, bridge, output, report):
         run(['codesign', '--verify', '--deep', '--strict', str(bundle)],
             output / (label + '-verify.log'))
         binary = executable(bundle)
+        info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
+        require(info['CFBundleVersion'] == info['CFBundleShortVersionString'] == RELEASE_VERSION,
+                label + ' compiled bundle version differs')
+        descriptor = (info['CFBundleIdentifier'].encode().ljust(64, b'\0') +
+                      RELEASE_VERSION.encode().ljust(64, b'\0'))
+        require(binary.read_bytes().count(descriptor) == 1,
+                label + ' compiled module version differs')
+        if label == 'backend':
+            require(('%s (RTLAirLink ' + RELEASE_VERSION + ')').encode() in binary.read_bytes(),
+                    'System Information version differs')
         imports = set(subprocess.check_output(['nm', '-u', '-j', str(binary)], text=True).split())
         require(not imports - set(CONFIG[key]), label + ' has unreviewed imports')
         if label == 'frontend':
             require(set(CONFIG['native_required_frontend_imports']) <= imports,
                     'Required frontend imports are missing')
-        cohort[label] = {'uuid': uuid(binary), 'sha256': sha(binary),
+        cohort[label] = {'uuid': uuid(binary), 'sha256': sha(binary), 'version': RELEASE_VERSION,
                          'bundle_identifier': plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())['CFBundleIdentifier']}
     report.update(status='BUILD_VERIFIED_RUNTIME_UNPROVEN', cohort=cohort)
     (assembly / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -145,11 +166,11 @@ def assemble(work, bridge, output, report):
     shutil.copy(ROOT / 'tools/download_dependencies.py', assembly / 'tools/download_dependencies.py')
     verified = output / 'VERIFIED_KEXTS'
     assembly.rename(verified)
-    with zipfile.ZipFile(output / 'RTLAirLink-v0.1.0-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output / f'RTLAirLink-v{RELEASE_VERSION}-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(verified.rglob('*')):
             if path.is_file():
-                archive.write(path, 'RTLAirLink-v0.1.0/' + path.relative_to(verified).as_posix())
-    with zipfile.ZipFile(output / 'RTLAirLink-v0.1.0-x86_64.zip') as archive:
+                archive.write(path, f'RTLAirLink-v{RELEASE_VERSION}/' + path.relative_to(verified).as_posix())
+    with zipfile.ZipFile(output / f'RTLAirLink-v{RELEASE_VERSION}-x86_64.zip') as archive:
         require(archive.testzip() is None, 'Release ZIP CRC check failed')
 
 
@@ -165,7 +186,7 @@ def main():
     require(version == CONFIG['macos_build'], 'Build is pinned to macOS ' + CONFIG['macos_build'])
     output = ROOT / 'build' / datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     output.mkdir(parents=True)
-    report = {'status': 'INCOMPLETE', 'profile': 'RTLAirLink', 'release_version': '0.1.0', 'project': 'RTLAirLink',
+    report = {'status': 'INCOMPLETE', 'profile': 'RTLAirLink', 'release_version': RELEASE_VERSION, 'project': 'RTLAirLink',
               'macos_build': version, 'architecture': platform.machine(),
               'front_back_abi': 7, 'installed': False, 'efi_modified': False,
               'runtime_airdrop_verified': False,
@@ -207,7 +228,7 @@ def main():
         report.update(status='BUILD_FAILED', error=str(error))
         for folder in ('assembly', 'VERIFIED_KEXTS'):
             shutil.rmtree(output / folder, ignore_errors=True)
-        (output / 'RTLAirLink-v0.1.0-x86_64.zip').unlink(missing_ok=True)
+        (output / f'RTLAirLink-v{RELEASE_VERSION}-x86_64.zip').unlink(missing_ok=True)
         raise
     finally:
         (output / 'BUILD_REPORT.json').write_text(json.dumps(report, indent=2) + '\n')

@@ -13,3 +13,5 @@ Output is under `build/<timestamp>/`. Only a successful complete build creates `
 `bash build.sh --checks-only` runs source checks without creating kexts. For an unloaded Legacy dependency, pass `--legacy-image` with the exact executable as described in README.md. A mismatched loaded Legacy image remains an error.
 
 GPL-covered source and build scripts for each release are published in the same tagged revision and source archive. Firmware/vendor terms remain separate; retain their notices. `UPSTREAM_SNAPSHOT_SHA256.json` records the pre-publication research-source snapshot; documentation lists the subsequent publication changes.
+
+The backend plist provides the release version. The builder checks all three project plists and both version headers against it, then verifies each compiled module descriptor and the System Information display string before creating the paired ZIP.

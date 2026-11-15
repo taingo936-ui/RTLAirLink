@@ -15,6 +15,8 @@ Môi trường kiểm tra hiện tại: RTL8852BE, Intel/x86_64, macOS build `25
 
 Xem [hướng dẫn cài](docs/INSTALL.md) và [cách build](docs/BUILD.md).
 
+Gói tương ứng cũng có tại [GitHub Packages](https://github.com/users/taingo936-ui/packages/container/package/rtlairlink), địa chỉ `ghcr.io/taingo936-ui/rtlairlink:v0.1.0`. Gói OCI chứa nguyên năm file của Release; xem [cách tải bằng ORAS](docs/PACKAGES.md). Có thể tải ZIP trực tiếp trong Releases.
+
 Theo hướng dẫn AirPort_RTW89 gốc, phải có thêm **IOSkywalkFamily.kext, IO80211FamilyLegacy.kext và AMFIPass.kext**, ngoài Lilu. Gói Release kèm `Download-Dependencies.command` để tải đúng ba ZIP từ nguồn OCLP và kiểm tra SHA256. Xem [dependency và cấu hình OpenCore](docs/DEPENDENCIES.md) để biết thứ tự nạp, bỏ plugin Broadcom, chặn Skywalk hệ thống, SecureBootModel và boot-arg Tahoe. Ba binary bên ngoài không được đóng lại trong gói của dự án, giống cách phát hành upstream.
 
 Lệnh build:

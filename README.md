@@ -26,6 +26,8 @@ Other PCI IDs present in inherited source are not a claim of tested support. App
 
 Use the paired ZIP from [GitHub Releases](https://github.com/taingo936-ui/RTLAirLink/releases). Read [INSTALL.md](docs/INSTALL.md) before changing OpenCore. Apple Wi-Fi system kexts, Bluetooth drivers, Lilu, AMFIPass and a personal EFI/config are not included in the release.
 
+The same release files are also distributed through [GitHub Packages](https://github.com/users/taingo936-ui/packages/container/package/rtlairlink) as `ghcr.io/taingo936-ui/rtlairlink:v0.1.0`. See [download and publishing instructions](docs/PACKAGES.md).
+
 As in the [upstream installer guide](https://github.com/FranciumOS-org/AirPort_RTW89#requirements), install **IOSkywalkFamily, IO80211FamilyLegacy and AMFIPass**, plus Lilu. The release includes `Download-Dependencies.command`, pinned download hashes and the [complete dependency/setup guide](docs/DEPENDENCIES.md), including the system-Skywalk block and Tahoe boot argument.
 
 ## Build from source

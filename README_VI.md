@@ -2,6 +2,8 @@
 
 Bản thử nghiệm driver Realtek RTL8852BE cho macOS, phát triển từ AirPort_RTW89 và các thay đổi Owly cho AWDL/AirDrop.
 
+[![Ủng hộ qua Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
+
 Hai kext được phát hành cùng nhau:
 
 - `RTLAirLink.kext`: driver Wi-Fi, chứa frontend `AirPortRTW89Front.kext`.

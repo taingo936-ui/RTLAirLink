@@ -2,6 +2,8 @@
 
 Experimental Realtek RTL8852BE Wi-Fi and native AWDL integration for macOS, derived from [AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89) and the Owly development work.
 
+[![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
+
 The project ships two top-level kext bundles together:
 
 | Bundle | Role |
@@ -59,8 +61,5 @@ bash build.sh --checks-only
 See [BUILD.md](docs/BUILD.md), [STATUS.md](docs/STATUS.md), [MODIFICATIONS.md](MODIFICATIONS.md), and the [Vietnamese overview](README_VI.md).
 
 ## License and attribution
-
-<!-- Buy Me a Coffee: add a badge/link here only after the owner provides their
-actual account URL; configure .github/FUNDING.yml at the same time. -->
 
 The driver/bridge work is distributed under GPLv2; retain original copyright and license notices. [CREDITS.md](CREDITS.md) identifies the inherited projects. Dependencies retain their licenses in their source trees and [LICENSES](LICENSES/). Realtek firmware remains under its own terms, including its redistribution and patent conditions; it is not relicensed under GPLv2. RTLAirLink is an independent derivative project and does not claim endorsement by Realtek, Apple or upstream authors.

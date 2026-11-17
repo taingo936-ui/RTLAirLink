@@ -13,7 +13,6 @@ Hai kext được phát hành cùng nhau:
 - `RTLAirLink.kext`: driver Wi-Fi, chứa frontend `AirPortRTW89Front.kext`.
 - `RTLAirBridge.kext`: cầu nối Lilu với Wi-Fi Legacy của Apple.
 
-Đổi tên thư mục kext, CFBundleName/CFBundleDisplayName và nhãn model/driver Wi-Fi. Mục model vẫn ghi đúng chip Realtek được phát hiện. Bundle ID, executable, class, tên thư mục frontend và boot-args giữ nguyên. Cần thay cả hai kext từ cùng một bản build; không nạp thêm bản tên cũ vì bundle ID trùng nhau.
 
 Bản phát hành **v0.1.0 vẫn là thử nghiệm**. Quá trình phát triển đã có truyền file thật hai chiều qua AWDL nhưng còn Waiting và mất dấu thiết bị. Bản này sửa hai lỗi phản hồi BlockAck và bổ sung tên hiển thị RTLAirLink. Kiểm thử mã nguồn và build đã qua; bộ kext đổi tên vẫn cần xác nhận đầy đủ bridge, tên trong System Information và độ ổn định sau boot. Tên/ảnh liên hệ trùng do tài khoản không được thay đổi bởi driver.
 

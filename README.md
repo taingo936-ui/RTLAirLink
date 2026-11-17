@@ -1,6 +1,6 @@
 # RTLAirLink
 
-Experimental Realtek RTL8852BE Wi-Fi and native AWDL integration for macOS, derived from [AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89) and the Owly development work.
+Experimental Realtek RTL8852BE Wi-Fi and native AWDL integration for macOS, derived from [AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89) and the [Owly] (https://github.com/t4t5/owly) development work.
 
 [![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
 

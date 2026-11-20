@@ -1,6 +1,6 @@
 # RTLAirLink
 
-Experimental Realtek RTL8852BE kext for macOS featuring custom-engineered AWDL/AirDrop support (Base 802.11 Wi-Fi driver adapted form [AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89)UI/helper concepts inspired by Owly).
+Experimental Realtek RTL8852BE kext for macOS featuring custom-engineered AWDL/AirDrop support (Base 802.11 Wi-Fi driver adapted form [AirPort_RTW89](https://github.com/FranciumOS-org/AirPort_RTW89) ;UI/helper concepts inspired by Owly).
 
 [![Support on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/taingo)
 
